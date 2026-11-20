@@ -129,3 +129,21 @@ FROM t
 WHERE {' AND '.join(where)}
 GROUP BY 1
 ORDER BY value DESC NULLS LAST{limit}"""
+
+    def error_mix(self, plan: Plan, extra_filters: list[Filter]) -> str:
+        """Failure counts by error code in both periods for one segment (cell)."""
+        assert plan.current and plan.baseline
+        filters = [*plan.filters, *extra_filters]
+        where = [f"({_window_predicate(plan.current)} OR {_window_predicate(plan.baseline)})"]
+        where += self._filter_sql(filters)
+        return f"""{self._base()}
+SELECT
+  COALESCE(t.error_code, '(none)') AS error_code,
+  CASE WHEN {_window_predicate(plan.current)} THEN 'current' ELSE 'baseline' END AS period,
+  COUNT(*) FILTER (WHERE t.status = 'FAILED') AS failures,
+  COUNT(*) FILTER (WHERE t.status <> 'USER_CANCELLED') AS attempts
+FROM t
+{self._joins_for([], filters)}
+WHERE {' AND '.join(where)}
+GROUP BY 1, 2
+ORDER BY 1, 2"""

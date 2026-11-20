@@ -25,6 +25,9 @@ SIGNIFICANCE_ALPHA = 0.05
 # Crossed segments mean ~100 tests per question, so drivers need stronger evidence.
 DRIVER_ALPHA = 0.01
 SECONDARY_DRIVER_MIN_SHARE = 0.20
+# Very strong evidence overrides the small-sample rule (e.g. a one-day outage at one bank).
+STRONG_EVIDENCE_P = 1e-6
+STRONG_EVIDENCE_MIN_N = 30
 MIX_SHIFT_MIN_PP = 0.05  # 5 percentage points of share
 
 
@@ -209,7 +212,11 @@ def find_rate_drivers(delta: float, stratified: list[Decomposition],
     candidates: list[Driver] = []
     for d in stratified:
         for s in d.segments:
-            if (s.p_value is not None and s.p_value < DRIVER_ALPHA and not s.small_sample
+            enough_data = not s.small_sample or (
+                s.p_value is not None and s.p_value < STRONG_EVIDENCE_P
+                and min(s.den0, s.den1) >= STRONG_EVIDENCE_MIN_N
+            )
+            if (s.p_value is not None and s.p_value < DRIVER_ALPHA and enough_data
                     and _same_direction(s.rate, delta) and abs(s.rate) >= 0.10 * abs(delta)
                     and s.value0 is not None and s.value1 is not None):
                 candidates.append(Driver(
