@@ -116,6 +116,8 @@ ORDER BY 1, 2"""
         dims = self._as_list(dimension)
         seg = self._segment_expr(dims)
         where = [_window_predicate(window), *self._filter_sql(plan.filters)]
+        if dims == ["error_code"]:
+            return self._error_code_breakdown(plan, window, where)
         metric_sql = self.semantic.metric(plan.metric).sql()
         limit = f"\nLIMIT {int(plan.top_n)}" if plan.top_n else ""
         return f"""{self._base()}
@@ -147,3 +149,25 @@ FROM t
 WHERE {' AND '.join(where)}
 GROUP BY 1, 2
 ORDER BY 1, 2"""
+
+    def _error_code_breakdown(self, plan: Plan, window: TimeWindow, where: list[str]) -> str:
+        """Failures per error code as a share of ALL attempts (codes sum to the failure rate).
+
+        A per-code 'failure rate' would be meaningless (every TIMEOUT row is a failure).
+        """
+        limit = f"\nLIMIT {int(plan.top_n)}" if plan.top_n else ""
+        return f"""{self._base()},
+g AS (
+  SELECT
+    COALESCE(t.error_code, '(none)') AS segment,
+    COUNT(*) FILTER (WHERE t.status = 'FAILED') AS num,
+    COUNT(*) FILTER (WHERE t.status <> 'USER_CANCELLED') AS attempts
+  FROM t
+  {self._joins_for([], plan.filters)}
+  WHERE {' AND '.join(where)}
+  GROUP BY 1
+)
+SELECT segment, num, den, CAST(num AS DOUBLE) / NULLIF(den, 0) AS value
+FROM (SELECT segment, num, SUM(attempts) OVER () AS den FROM g)
+WHERE num > 0
+ORDER BY value DESC{limit}"""

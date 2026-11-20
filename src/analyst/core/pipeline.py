@@ -257,10 +257,14 @@ class AnalystPipeline:
             for d in dims:
                 r = self._query(ctx, f"Segment comparison by {d}",
                                 self.builder.segment_comparison(plan, d))
-                by_dim[d] = A.decompose(r.data, is_ratio=metric.is_ratio, dimension=d,
-                                        days0=days0, days1=days1)
+                dec = A.decompose(r.data, is_ratio=metric.is_ratio, dimension=d,
+                                  days0=days0, days1=days1)
+                if len(dec.segments) < 2:
+                    continue  # e.g. channel when filtered to NETBANKING: nothing to compare
+                by_dim[d] = dec
                 dim_qids[d] = r.query_id
-            st.detail = f"{len(dims)} dimensions"
+            dims = list(by_dim)
+            st.detail = f"{len(dims)} informative dimensions"
 
         material = 0.003 if metric.is_ratio else 0.03 * abs(totals.value0 or 1)
         stratified: list[A.Decomposition] = []
@@ -269,7 +273,7 @@ class AnalystPipeline:
             if metric.is_ratio and by_dim:
                 mix_dim, mix_driver = A.find_mix_dimension(totals, by_dim)
                 strat_dim = mix_dim or ("payment_method" if "payment_method" in by_dim
-                                        else next(iter(by_dim)))
+                                        else _most_explanatory(by_dim))
                 stratified.append(by_dim[strat_dim])
                 for other in dims:
                     if other == strat_dim:
@@ -337,6 +341,11 @@ class AnalystPipeline:
         answer.caveats = list(plan.assumptions) + [
             "Free-form SQL was written by the LLM and passed the safety checks; review the "
             "query in the evidence panel before relying on it."]
+
+
+def _most_explanatory(by_dim: dict[str, A.Decomposition]) -> str:
+    """Dimension containing the single largest segment-level rate effect."""
+    return max(by_dim, key=lambda d: max((abs(s.rate) for s in by_dim[d].segments), default=0))
 
 
 def _records(df: pd.DataFrame, n: int) -> list[dict]:

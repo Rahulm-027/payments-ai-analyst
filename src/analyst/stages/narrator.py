@@ -150,6 +150,9 @@ class Narrator:
         t = ch.totals
         direction = "fell" if t.delta < 0 else "rose"
         unit = "" if metric.is_ratio else " (daily average)"
+        if plan.filters:
+            unit += " for " + " / ".join(
+                ("not " if f.negate else "") + ", ".join(f.values) for f in plan.filters)
 
         n.facts.append(Fact(
             statement=(f"{metric.label}{unit} {direction} from {fmt_value(metric, t.value0)} to "
@@ -189,9 +192,11 @@ class Narrator:
                 lead = "On top of that" if (mix and i == 0) else ("The main driver is"
                                                                   if i == 0 else "Also")
                 sep = "," if lead != "The main driver is" else ""
+                offset = (" - more than the whole change, because other segments partly offset it"
+                          if abs(r.share_of_delta) > 1.05 else "")
                 parts.append(f"{lead}{sep} {cell_label(r)} {r.detail.split(' (')[0]}, "
                              f"accounting for {r.effect * 100:+.2f} pp "
-                             f"({abs(r.share_of_delta):.0%} of the change).")
+                             f"({abs(r.share_of_delta):.0%} of the change{offset}).")
             for c in contribs:
                 parts.append(f"{c.dimension.replace('_', ' ').title()} '{c.segment}' contributed "
                              f"{fmt_delta(metric, c.effect)} ({abs(c.share_of_delta):.0%} of the "
@@ -434,11 +439,22 @@ class Narrator:
                                 time_window=window, filters=filt))
             return n
         top, bottom = df.iloc[0], df.iloc[-1]
-        lead = f"{metric.label} by {dim} for {window}"
-        n.summary = (f"{lead}: highest {top['segment']} ({fmt_value(metric, top['value'])}), "
-                     f"lowest {bottom['segment']} ({fmt_value(metric, bottom['value'])})"
-                     + (f"; overall {fmt_value(metric, overall)}" if overall is not None else "")
-                     + ".")
+        if dim == "error_code":
+            lead = f"Failed attempts by error code (share of all attempts) for {window}"
+            n.summary = (f"{lead}: largest {top['segment']} ({top['value']:.2%} of attempts), "
+                         f"smallest {bottom['segment']} ({bottom['value']:.2%}); total failure "
+                         f"rate {df['value'].sum():.2%}.")
+            metric = metric.__class__(**{**metric.__dict__, "label": "Share of attempts"})
+        else:
+            lead = f"{metric.label} by {dim} for {window}"
+            if len(df) == 1:
+                n.summary = (f"{lead}: {top['segment']} {fmt_value(metric, top['value'])} - the "
+                             "only segment within your data scope.")
+            else:
+                n.summary = (f"{lead}: highest {top['segment']} ({fmt_value(metric, top['value'])}), "
+                             f"lowest {bottom['segment']} ({fmt_value(metric, bottom['value'])})"
+                             + (f"; overall {fmt_value(metric, overall)}" if overall is not None
+                                else "") + ".")
         small = df[df["den"] < A.SMALL_SAMPLE_WARNING]["segment"].tolist()
         if small and metric.is_ratio:
             n.caveats.append(f"Small samples (<{A.SMALL_SAMPLE_WARNING} attempts): "
