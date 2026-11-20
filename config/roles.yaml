@@ -1,30 +1,33 @@
-# Role-based access control. Enforced in code by rewriting the validated SQL AST -
-# never by asking the LLM to behave.
+# Role-based access control. Enforced in code by rewriting the validated SQL AST:
+# every table reference is replaced with a "secure view" subquery that drops blocked
+# columns and applies the role's row scope. The LLM is never trusted to enforce this.
 
 roles:
   admin:
     description: Full access, including restricted columns.
-    row_filters: {}
-    blocked_columns: []
     allowed_tables: [transactions, merchants, banks, settlements, data_freshness]
+    blocked_columns: {}
+    scope: {}
 
   analyst:
     description: All rows, but no customer- or card-level identifiers.
-    row_filters: {}
+    allowed_tables: [transactions, merchants, banks, settlements, data_freshness]
     blocked_columns:
       transactions: [card_bin, customer_id]
-    allowed_tables: [transactions, merchants, banks, settlements, data_freshness]
+    scope: {}
 
   regional_manager_north:
     description: Merchant-success manager for the North region only. No settlements, no identifiers.
-    row_filters:
-      merchants: "region = 'North'"
+    allowed_tables: [transactions, merchants, banks, data_freshness]
     blocked_columns:
       transactions: [card_bin, customer_id]
-    allowed_tables: [transactions, merchants, banks, data_freshness]
+    # Row scope on merchant attributes. Applied to merchants directly and to
+    # transactions/settlements through merchant_id.
+    scope:
+      region: [North]
 
 users:
-  # demo users selectable in the UI / passed as X-User header to the API
-  asha:   {role: admin,                  display: "Asha (Admin)"}
-  rohit:  {role: analyst,                display: "Rohit (Payments Analyst)"}
-  neha:   {role: regional_manager_north, display: "Neha (North Region Manager)"}
+  # Demo users, selectable in the UI or passed as the X-User header to the API.
+  asha:  {role: admin,                  display: "Asha (Admin)"}
+  rohit: {role: analyst,                display: "Rohit (Payments Analyst)"}
+  neha:  {role: regional_manager_north, display: "Neha (North Region Manager)"}
