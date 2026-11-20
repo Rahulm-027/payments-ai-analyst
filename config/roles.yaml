@@ -1,0 +1,30 @@
+# Role-based access control. Enforced in code by rewriting the validated SQL AST -
+# never by asking the LLM to behave.
+
+roles:
+  admin:
+    description: Full access, including restricted columns.
+    row_filters: {}
+    blocked_columns: []
+    allowed_tables: [transactions, merchants, banks, settlements, data_freshness]
+
+  analyst:
+    description: All rows, but no customer- or card-level identifiers.
+    row_filters: {}
+    blocked_columns:
+      transactions: [card_bin, customer_id]
+    allowed_tables: [transactions, merchants, banks, settlements, data_freshness]
+
+  regional_manager_north:
+    description: Merchant-success manager for the North region only. No settlements, no identifiers.
+    row_filters:
+      merchants: "region = 'North'"
+    blocked_columns:
+      transactions: [card_bin, customer_id]
+    allowed_tables: [transactions, merchants, banks, data_freshness]
+
+users:
+  # demo users selectable in the UI / passed as X-User header to the API
+  asha:   {role: admin,                  display: "Asha (Admin)"}
+  rohit:  {role: analyst,                display: "Rohit (Payments Analyst)"}
+  neha:   {role: regional_manager_north, display: "Neha (North Region Manager)"}

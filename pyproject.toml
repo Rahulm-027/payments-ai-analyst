@@ -1,0 +1,40 @@
+[project]
+name = "payments-ai-analyst"
+version = "0.1.0"
+description = "An AI business analyst for payment performance data: safe text-to-SQL, segment analysis and evidence-backed answers."
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.0",
+    "sqlglot>=25.0",
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "streamlit>=1.33",
+    "plotly>=5.20",
+    "groq>=0.9",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

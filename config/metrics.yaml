@@ -1,0 +1,107 @@
+# Semantic layer: the single source of truth for metric definitions.
+# The LLM chooses metrics and dimensions from this file; it never invents formulas.
+# SQL fragments assume the base relation is aliased `t` (deduplicated transactions)
+# and joined dimensions are aliased `m` (merchants) and `b` (banks).
+
+base_relation:
+  name: txn_clean
+  description: >
+    Deduplicated transactions. The raw feed can contain replayed rows with the same txn_id,
+    so all metrics are computed on SELECT DISTINCT rows.
+  sql: "(SELECT DISTINCT * FROM transactions)"
+  time_column: created_at
+
+metrics:
+  success_rate:
+    label: Payment success rate
+    description: Share of attempted payments that succeeded. User-cancelled attempts are excluded from the denominator.
+    numerator: "COUNT(*) FILTER (WHERE t.status = 'SUCCESS')"
+    denominator: "COUNT(*) FILTER (WHERE t.status <> 'USER_CANCELLED')"
+    format: percent
+    higher_is_better: true
+    synonyms: [success rate, SR, approval rate, conversion]
+    default_denominator_note: "Denominator = attempts excluding USER_CANCELLED."
+
+  success_rate_incl_cancelled:
+    label: Success rate (all attempts)
+    description: Alternative definition that keeps user-cancelled attempts in the denominator.
+    numerator: "COUNT(*) FILTER (WHERE t.status = 'SUCCESS')"
+    denominator: "COUNT(*)"
+    format: percent
+    higher_is_better: true
+    synonyms: [raw success rate]
+
+  failure_rate:
+    label: Failure rate
+    description: Share of non-cancelled attempts that failed.
+    numerator: "COUNT(*) FILTER (WHERE t.status = 'FAILED')"
+    denominator: "COUNT(*) FILTER (WHERE t.status <> 'USER_CANCELLED')"
+    format: percent
+    higher_is_better: false
+    synonyms: [decline rate, failure rate]
+
+  attempts:
+    label: Payment attempts
+    description: Number of payment attempts (deduplicated), including cancelled.
+    expression: "COUNT(*)"
+    format: integer
+    higher_is_better: true
+    synonyms: [volume, transactions, txn count]
+
+  successful_txns:
+    label: Successful transactions
+    expression: "COUNT(*) FILTER (WHERE t.status = 'SUCCESS')"
+    format: integer
+    higher_is_better: true
+
+  gmv:
+    label: Gross merchandise value (INR)
+    description: Sum of amount for successful transactions.
+    expression: "SUM(t.amount) FILTER (WHERE t.status = 'SUCCESS')"
+    format: currency
+    higher_is_better: true
+    synonyms: [GMV, TPV, processed value, revenue]
+
+  avg_ticket_size:
+    label: Average ticket size (INR)
+    expression: "AVG(t.amount) FILTER (WHERE t.status = 'SUCCESS')"
+    format: currency
+    higher_is_better: true
+    synonyms: [ATV, average transaction value]
+
+dimensions:
+  payment_method: {sql: "t.payment_method", values: [CARD, UPI, NETBANKING, WALLET]}
+  channel:        {sql: "t.channel", values: [POS, ONLINE]}
+  bank:           {sql: "b.bank_name", join: banks, note: "NULL for WALLET by design"}
+  bank_type:      {sql: "b.bank_type", join: banks}
+  card_network:   {sql: "t.card_network", note: "Only populated for CARD"}
+  error_code:     {sql: "t.error_code"}
+  status:         {sql: "t.status"}
+  merchant:       {sql: "m.merchant_name", join: merchants}
+  merchant_category: {sql: "m.category", join: merchants}
+  merchant_tier:  {sql: "m.tier", join: merchants}
+  city:           {sql: "m.city", join: merchants}
+  region:         {sql: "m.region", join: merchants}
+
+time_grains:
+  day:  "DATE_TRUNC('day', t.created_at)"
+  week: "DATE_TRUNC('week', t.created_at)"   # weeks start on Monday
+
+joins:
+  merchants: "LEFT JOIN merchants m ON m.merchant_id = t.merchant_id"
+  banks:     "LEFT JOIN banks b ON b.bank_id = t.bank_id"
+
+# Columns the LLM may reference. Anything else is rejected by the validator.
+allowed_tables:
+  transactions: [txn_id, created_at, merchant_id, channel, payment_method, bank_id,
+                 card_network, card_bin, customer_id, amount, status, error_code]
+  merchants: [merchant_id, merchant_name, category, city, region, tier, onboarded_on]
+  banks: [bank_id, bank_name, bank_type]
+  settlements: [settlement_id, merchant_id, settlement_date, txn_count, gross_amount,
+                fees, net_amount]
+  data_freshness: [table_name, loaded_through]
+
+defaults:
+  # Used when a question does not specify a time window - always stated in the answer caveats.
+  comparison: "last complete week vs the week before"
+  week_start: monday
