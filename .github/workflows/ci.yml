@@ -14,5 +14,20 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -e ".[dev]"
-      - run: ruff check src tests data eval config
+      - run: ruff check src tests data eval config ui
       - run: pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t payments-ai-analyst .
+      - name: Smoke-test API container
+        run: |
+          docker run -d --name api -p 8000:8000 payments-ai-analyst
+          for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 2; done
+          curl -sf -X POST localhost:8000/ask -H 'Content-Type: application/json' \
+            -H 'X-User: rohit' -d '{"question":"Why did success rate drop last week?"}' \
+            | python -c "import sys,json; a=json.load(sys.stdin); print(a['status'], a['summary'][:200]); assert a['status']=='answered'"

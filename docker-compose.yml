@@ -1,0 +1,30 @@
+services:
+  api:
+    build: .
+    image: payments-ai-analyst
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LLM_MODE: ${LLM_MODE:-offline}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  ui:
+    image: payments-ai-analyst
+    depends_on:
+      api:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LLM_MODE: ${LLM_MODE:-offline}
+    command: ["streamlit", "run", "ui/app.py", "--server.port", "8501", "--server.address", "0.0.0.0", "--server.headless", "true"]
+    ports:
+      - "8501:8501"
