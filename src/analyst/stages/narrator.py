@@ -160,6 +160,14 @@ class Narrator:
             query_id=totals_qid, dataset=DATASET, time_window=window, filters=filt,
         ))
 
+        if ch.classification == "no_material_change":
+            threshold = "0.3 pp" if metric.is_ratio else "3%"
+            n.facts.append(Fact(
+                statement=(f"The change is below the {threshold} materiality threshold, so the "
+                           f"{metric.label.lower()} is treated as broadly stable."),
+                query_id=totals_qid, dataset=DATASET, time_window=window, filters=filt,
+            ))
+
         mix = next((d for d in ch.drivers if d.kind == "mix"), None)
         rates = [d for d in ch.drivers if d.kind == "rate"]
         contribs = [d for d in ch.drivers if d.kind == "contribution"]
