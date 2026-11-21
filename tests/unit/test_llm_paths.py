@@ -172,3 +172,22 @@ def test_llm_choosing_outcome_or_few_dimensions_still_finds_drivers(make_pipe):
     p2 = make_pipe([oct21, "x"])
     a2 = p2.ask("why did SR fall on 21 Oct", "rohit")
     assert "Coastal Bank" in " ".join(f.statement for f in a2.facts)
+
+
+def test_llm_window_overridden_when_question_names_a_month(make_pipe):
+    """LLM swaps 'December' (no data) for last week - the named month must win."""
+    wrong = {"intent": "breakdown", "metric": "success_rate",
+             "current": {"start": "2026-11-09", "end": "2026-11-16"}}
+    p = make_pipe([wrong])
+    a = p.ask("Success rate in December", "rohit")
+    assert a.status == "error" and "No data" in a.summary
+    assert "did not match" in next(t for t in a.trace if t.stage == "plan").detail
+
+
+def test_llm_window_kept_when_it_matches(make_pipe):
+    ok = {"intent": "breakdown", "metric": "success_rate", "dimensions": ["bank"],
+          "current": {"start": "2026-10-01", "end": "2026-11-01"}}
+    p = make_pipe([ok, "x"])
+    a = p.ask("Success rate by bank in October", "rohit")
+    assert a.plan.current.start.isoformat() == "2026-10-01"
+    assert "did not match" not in next(t for t in a.trace if t.stage == "plan").detail

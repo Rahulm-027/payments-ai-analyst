@@ -51,6 +51,9 @@ Rules:
 - Data is loaded through {as_of}. "Last week" means the latest Monday-Sunday week that has
   data ({latest_week}); state this in assumptions.
 - If no period is given, use the latest week (and the week before as baseline).
+- If the user names a period (a date, week or month), use exactly that period even if it
+  falls outside the data range - never substitute a different period. The system reports
+  missing data itself.
 - Use exact catalog values for filters. Do not filter on dimensions not in the catalog list,
   except "merchant".
 - Success rate excludes USER_CANCELLED attempts unless the user explicitly asks to include
@@ -85,12 +88,37 @@ class Planner:
                                         json_mode=True, purpose="plan", usage=usage)
                 plan = self._validate(parse_json_object(raw))
                 notes.append(f"LLM plan accepted (attempt {attempt + 1})")
+                plan = self._enforce_explicit_dates(question, plan, notes)
                 return PlanningOutcome(plan, notes)
             except (LLMError, ValidationError, ValueError, KeyError, TypeError) as e:
                 error = str(e)[:500]
                 notes.append(f"LLM plan rejected (attempt {attempt + 1}): {error}")
         notes.append("fell back to rule-based planner")
         return PlanningOutcome(self.rules.plan(question), notes)
+
+    def _enforce_explicit_dates(self, question: str, plan: Plan, notes: list[str]) -> Plan:
+        """Explicit dates/months are parsed deterministically; if the LLM's window doesn't
+        overlap what the user literally named, the deterministic window wins."""
+        if plan.clarification_needed or plan.intent == "custom_sql" or plan.current is None:
+            return plan
+        q = " ".join(question.lower().split())
+        explicit = self.rules._find_windows(q, [])
+        relative = {"latest week", "yesterday", "today"}
+        if not explicit or explicit[0].label in relative or explicit[0].label.startswith("last "):
+            return plan
+        target = explicit[0]
+        if plan.current.start < target.end and target.start < plan.current.end:
+            return plan
+        rule_plan = self.rules.plan(question)
+        update = {"current": rule_plan.current or target}
+        if plan.intent == "explain_change" and rule_plan.baseline is not None:
+            update["baseline"] = rule_plan.baseline
+        notes.append(f"LLM window {plan.current.describe()} did not match the period named "
+                     f"in the question; using {update['current'].describe()}")
+        plan = plan.model_copy(update=update)
+        plan.assumptions = [*plan.assumptions,
+                            f"Period taken literally from the question: {update['current'].describe()}."]
+        return plan
 
     # ------------------------------------------------------------- prompts
     def _system(self) -> str:

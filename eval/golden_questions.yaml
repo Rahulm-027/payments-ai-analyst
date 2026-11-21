@@ -194,7 +194,13 @@ cases:
     expect:
       status: answered
       dimensions: [error_code]
-      contains: ["share of all attempts"]
+      reference:
+        - sql: |
+            SELECT COUNT(*) FILTER (WHERE status='FAILED' AND error_code='INSUFFICIENT_FUNDS')::DOUBLE
+                   / COUNT(*) FILTER (WHERE status<>'USER_CANCELLED')
+            FROM (SELECT DISTINCT * FROM transactions)
+            WHERE created_at::DATE = '2026-11-14'
+          format: percent
 
   - id: missing_bank_ids
     category: data_quality

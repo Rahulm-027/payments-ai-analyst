@@ -68,10 +68,12 @@ def evaluate_case(case: dict, answer: Answer, reference_sql: Callable[[str], flo
     for dim, values in (exp.get("filters") or {}).items():
         got = {f.dimension: f.values for f in (plan.filters if plan else [])}
         add(f"filter:{dim}", got.get(dim) == values, f"got {got}")
+    # Graded on summary + facts: facts are computed deterministically; in live mode the
+    # summary is an LLM rewording that may phrase the same finding differently.
     for s in exp.get("contains", []):
-        add(f"contains:{s}", s in answer.summary)
+        add(f"contains:{s}", s in text)
     for s in exp.get("not_contains", []):
-        add(f"not_contains:{s}", s not in answer.summary)
+        add(f"not_contains:{s}", s not in text)
     fired = {w.check for w in answer.quality_warnings}
     for q in exp.get("quality", []):
         add(f"quality:{q}", q in fired, f"fired {sorted(fired)}")
