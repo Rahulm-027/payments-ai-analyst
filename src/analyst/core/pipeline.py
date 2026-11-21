@@ -38,7 +38,7 @@ from analyst.stages.narrator import (
     cell_filters,
     fmt_filters,
 )
-from analyst.stages.planner import Planner
+from analyst.stages.planner import Planner, explanatory_dimensions
 from analyst.stages.quality import DataQualityChecker
 from analyst.stages.query_builder import QueryBuilder
 from analyst.stages.sql_generator import SqlGenerator
@@ -242,7 +242,9 @@ class AnalystPipeline:
         assert plan.current and plan.baseline
         days0 = effective_days.get("baseline", plan.baseline.days)
         days1 = effective_days.get("current", plan.current.days)
-        dims = [d for d in plan.dimensions if d in self.semantic.dimensions]
+        dims = [d for d in explanatory_dimensions(plan.dimensions,
+                                                  {f.dimension for f in plan.filters})
+                if d in self.semantic.dimensions]
         dim_qids: dict[str, str] = {}
 
         with ctx.stage("compare_periods") as st:

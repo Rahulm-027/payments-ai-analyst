@@ -188,15 +188,22 @@ def find_mix_dimension(totals: Decomposition,
         ((dim, d) for dim, d in by_dim.items() if _same_direction(d.mix_total, delta)),
         key=lambda kv: abs(kv[1].mix_total), reverse=True,
     )
-    if not candidates or abs(candidates[0][1].mix_total) < 0.25 * abs(delta):
+    # Take the strongest dimension whose mix effect is material AND has visible share movers
+    # (a dimension with hundreds of tiny segments can carry "mix" without any clear shift).
+    chosen: tuple[str, Decomposition, list[SegmentRow]] | None = None
+    for cand_dim, cand in candidates:
+        if abs(cand.mix_total) < 0.25 * abs(delta):
+            break
+        cand_movers = sorted(
+            (s for s in cand.segments if abs(s.w1 - s.w0) >= MIX_SHIFT_MIN_PP),
+            key=lambda s: abs(s.w1 - s.w0), reverse=True,
+        )
+        if cand_movers:
+            chosen = (cand_dim, cand, cand_movers)
+            break
+    if chosen is None:
         return None, None
-    dim, d = candidates[0]
-    movers = sorted(
-        (s for s in d.segments if abs(s.w1 - s.w0) >= MIX_SHIFT_MIN_PP),
-        key=lambda s: abs(s.w1 - s.w0), reverse=True,
-    )
-    if not movers:
-        return None, None
+    dim, d, movers = chosen
     detail = ", ".join(f"{s.segment} share {s.w0:.1%} → {s.w1:.1%}" for s in movers)
     return dim, Driver("mix", dim, ", ".join(s.segment for s in movers), d.mix_total,
                        d.mix_share, detail)

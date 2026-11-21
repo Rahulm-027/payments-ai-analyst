@@ -138,7 +138,20 @@ class Planner:
         if plan.intent == "explain_change":
             if plan.baseline is None:
                 raise ValueError("explain_change needs a baseline window")
-            if not plan.dimensions:
-                filtered = {f.dimension for f in plan.filters}
-                plan.dimensions = [d for d in DEFAULT_ANALYSIS_DIMENSIONS if d not in filtered]
+            plan.dimensions = explanatory_dimensions(plan.dimensions,
+                                                     {f.dimension for f in plan.filters})
         return plan
+
+
+# Outcome columns can't explain an outcome: splitting success rate by status/error_code is
+# circular (the SUCCESS segment always succeeds) and would swamp the mix analysis.
+OUTCOME_DIMENSIONS = {"status", "error_code"}
+
+
+def explanatory_dimensions(requested: list[str], filtered: set[str]) -> list[str]:
+    """LLM-chosen dimensions first, then the standard set - never fewer than the standard set."""
+    out: list[str] = []
+    for d in [*requested, *DEFAULT_ANALYSIS_DIMENSIONS]:
+        if d not in OUTCOME_DIMENSIONS and d not in filtered and d not in out:
+            out.append(d)
+    return out

@@ -156,3 +156,19 @@ def test_summary_may_use_numbers_from_quality_warnings(make_pipe):
     a = p.ask("why did SR drop last week", "rohit")
     assert "6.4 of 7 days" in a.summary
     assert next(t for t in a.trace if t.stage == "narrate_llm").status == "ok"
+
+
+def test_llm_choosing_outcome_or_few_dimensions_still_finds_drivers(make_pipe):
+    """LLM picks error_code/status and too few dims - analysis must still find mix + bank."""
+    week8 = {**WEEK8_PLAN, "dimensions": ["error_code", "status", "channel"]}
+    p = make_pipe([week8, "x"])
+    a = p.ask("why did SR drop last week", "rohit")
+    facts = " ".join(f.statement for f in a.facts)
+    assert "Mix shift across payment_method" in facts and "UPI / ONLINE" in facts
+    oct21 = {"intent": "explain_change", "metric": "success_rate",
+             "dimensions": ["payment_method", "bank_type", "channel"],
+             "current": {"start": "2026-10-21", "end": "2026-10-22"},
+             "baseline": {"start": "2026-10-14", "end": "2026-10-15"}}
+    p2 = make_pipe([oct21, "x"])
+    a2 = p2.ask("why did SR fall on 21 Oct", "rohit")
+    assert "Coastal Bank" in " ".join(f.statement for f in a2.facts)
