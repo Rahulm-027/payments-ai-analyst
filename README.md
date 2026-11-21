@@ -58,7 +58,7 @@ docker compose up --build
 ```bash
 pip install -e ".[dev]"
 make data       # builds data/payments.duckdb (~350K rows, ~4 s, seeded)
-make test       # 103 tests
+make test       # 105 tests
 make eval       # golden-question evaluation -> eval/results.md
 make run-ui     # Streamlit on :8501
 make run-api    # FastAPI on :8000
@@ -230,16 +230,32 @@ Additional LLM failure handling (tested with a scripted fake model in `test_llm_
 make eval          # writes eval/results.md
 ```
 
-**Offline mode: 26/26 cases, 79/79 checks.** See [`eval/results.md`](eval/results.md). The set also runs in CI as a regression gate.
+| Mode | Planner / summary | Result |
+|---|---|---|
+| Offline | rule-based planner, template summary | **26/26 cases, 79/79 checks** ([results](eval/results.md); also a CI regression gate) |
+| Live | `openai/gpt-oss-120b` on Groq | **26/26 cases, 79/79 checks** ([results](eval/results-live.md)) |
 
-> **Honest caveat:** the rule-based planner and these questions were written together, so the offline score shows the system is correct on its target scenarios, not that it generalises to new phrasings. Running `LLM_MODE=live make eval` measures the LLM planner on the same questions. A larger set of paraphrased questions is the next step (see below).
+**How the live score got there.** Each run uncovered something and was fixed at its root:
+
+| Run | Score | What failed | Fix |
+|---|---|---|---|
+| 1 | 22/26 | 3 checks matched exact summary phrases, which the LLM reworded. **Real bug:** for "Success rate in December" the LLM swapped the requested month (no data) for a period that had data. | Findings graded on the computed facts, not the reworded summary. Explicit dates/months are now parsed deterministically and override a mismatching LLM window. |
+| 2 | 24/26 | "Broadly stable" existed only in the template summary; the trend check assumed the rule planner's default 8-week window. | Stability conclusion is now a computed fact. Trend check uses a value every reasonable window contains. |
+| 3 | 26/26 | – | – |
+
+Interactive testing in live mode also found and fixed: a retired Groq model ID; the LLM picking
+outcome columns (`error_code`/`status`) or too few dimensions to explain a change (it now
+always analyses the standard dimensions as well); and a question naming a hidden column
+getting "not found" instead of an explicit access denial.
+
+> **Honest caveat:** the rule-based planner and these questions were written together, so the offline score shows correctness on the target scenarios rather than generalisation. The live run is the better signal, but 26 questions is still a small set. A larger set of paraphrased questions is the next step (see below).
 
 ---
 
 ## Testing
 
 ```bash
-make test     # 103 tests, ~22 s
+make test     # 105 tests, ~20 s
 make lint
 ```
 
