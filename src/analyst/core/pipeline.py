@@ -7,6 +7,7 @@ evidence, and every failure maps to an explicit answer status instead of an exce
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 from contextlib import contextmanager
@@ -170,6 +171,9 @@ class AnalystPipeline:
 
     # ------------------------------------------------------------------ internals
     def _ask(self, question: str, ctx: RunContext, answer: Answer) -> None:
+        with ctx.stage("access_precheck") as st:
+            _deny_restricted_columns(question, ctx.user)
+            st.detail = "no restricted fields requested"
         with ctx.stage("plan") as st:
             outcome = self.planner.plan(question, ctx.usage)
             plan = outcome.plan
@@ -343,6 +347,19 @@ class AnalystPipeline:
         answer.caveats = list(plan.assumptions) + [
             "Free-form SQL was written by the LLM and passed the safety checks; review the "
             "query in the evidence panel before relying on it."]
+
+
+def _deny_restricted_columns(question: str, user: User) -> None:
+    """Deterministic guard: a question naming a column hidden from this role is denied
+    up front with a clear reason, whatever the LLM would have planned."""
+    q = re.sub(r"[^a-z0-9]+", " ", question.lower())
+    for col in sorted(user.role.all_blocked_columns()):
+        if re.search(rf"\b{re.escape(col.replace('_', ' '))}s?\b", q):
+            raise AccessDenied(
+                f"question references restricted column '{col}'",
+                user_message=(f"Your role ({user.role.name}) can't access {col}. "
+                              "It is a customer/card-level identifier."),
+            )
 
 
 def _most_explanatory(by_dim: dict[str, A.Decomposition]) -> str:
