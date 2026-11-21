@@ -140,3 +140,19 @@ def test_llm_usage_is_tracked(make_pipe):
 def test_grounding_check(text, ok):
     source = "Payment success rate fell from 92.79% to 90.84% (-1.95 pp)."
     assert (ungrounded_numbers(text, source) == []) is ok
+
+
+def test_clarification_without_intent_is_accepted(make_pipe):
+    p = make_pipe([{"clarification_needed": "Which metric?",
+                    "clarification_options": ["Success rate last week?", "GMV last week?"]}])
+    a = p.ask("How are we doing?", "rohit")
+    assert a.status == "needs_clarification" and a.plan.planner == "llm"
+    assert a.clarification_options
+
+
+def test_summary_may_use_numbers_from_quality_warnings(make_pipe):
+    p = make_pipe([WEEK8_PLAN,
+                   "Success rate fell from 92.79% to 90.84%; the latest week has only 6.4 of 7 days."])
+    a = p.ask("why did SR drop last week", "rohit")
+    assert "6.4 of 7 days" in a.summary
+    assert next(t for t in a.trace if t.stage == "narrate_llm").status == "ok"

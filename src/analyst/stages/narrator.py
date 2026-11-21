@@ -482,7 +482,8 @@ class Narrator:
         """Let the LLM rewrite the summary - accepted only if every number is grounded."""
         if self.llm is None:
             return
-        grounded = " ".join([narrative.summary, *(f.statement for f in narrative.facts)])
+        grounded = " ".join([narrative.summary, *(f.statement for f in narrative.facts),
+                             *(w.message for w in warnings), *narrative.caveats])
         prompt = (f"QUESTION: {question}\n\nDRAFT SUMMARY: {narrative.summary}\n\nFACTS:\n"
                   + "\n".join(f"- {f.statement}" for f in narrative.facts)
                   + ("\n\nDATA WARNINGS:\n" + "\n".join(f"- {w.message}" for w in warnings)

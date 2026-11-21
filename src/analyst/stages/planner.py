@@ -38,8 +38,10 @@ Return ONLY a JSON object with these keys:
 - top_n: integer or null.
 - assumptions: list of short strings stating every default you applied (time window,
   metric definition, denominator). Be explicit.
-- clarification_needed: null, or a short question if the request is too vague to answer
-  (e.g. no metric and no clear subject). Prefer reasonable defaults over asking.
+- clarification_needed: null, or a short question when the request names NO metric and NO
+  specific subject (e.g. "how are we doing?", "what's going on?", "give me an update").
+  In that case still return "intent": "breakdown" and do not guess a metric.
+  If a metric or a clear subject is named, apply defaults instead of asking.
 - clarification_options: 2-3 example rephrasings when clarification_needed is set.
 - custom_request: for custom_sql only, a precise restatement of what to compute.
 
@@ -109,6 +111,8 @@ class Planner:
     def _validate(self, obj: dict) -> Plan:
         obj = {k: v for k, v in obj.items() if v is not None}
         obj["planner"] = "llm"
+        if obj.get("clarification_needed"):
+            obj.setdefault("intent", "breakdown")  # intent is irrelevant when we ask back
         plan = Plan.model_validate(obj)
         if plan.clarification_needed:
             return plan
