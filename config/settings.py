@@ -21,7 +21,7 @@ CONFIG_DIR = ROOT / "config"
 class Settings:
     llm_mode: str = os.getenv("LLM_MODE", "offline")
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
-    groq_model: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    groq_model: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     db_path: Path = ROOT / os.getenv("DB_PATH", "data/payments.duckdb")
     query_timeout_seconds: float = float(os.getenv("QUERY_TIMEOUT_SECONDS", "10"))
     max_result_rows: int = int(os.getenv("MAX_RESULT_ROWS", "5000"))

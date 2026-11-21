@@ -310,7 +310,7 @@ tests/           unit · integration
 - **Data:** synthetic (fictional banks and merchants), modelled on a POS + online acquirer.
 - **Authentication:** demo users chosen in the UI or sent as a header; roles live in YAML.
 - **Warehouse:** a local DuckDB file stands in for the real warehouse. The executor interface would map to Snowflake or BigQuery with server-side cost controls.
-- **LLM:** Groq (Llama 3.3 70B) behind a provider interface; offline mode needs no key.
+- **LLM:** Groq (`openai/gpt-oss-120b`, configurable via `GROQ_MODEL`) behind a provider interface; offline mode needs no key.
 
 **Limitations**
 - **Statistics:** the significance tests are heuristic (two-proportion z-tests at α = 0.01 with specificity rules). There is no formal multiple-testing correction.
