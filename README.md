@@ -58,7 +58,7 @@ docker compose up --build
 ```bash
 pip install -e ".[dev]"
 make data       # builds data/payments.duckdb (~350K rows, ~4 s, seeded)
-make test       # 99 tests
+make test       # 103 tests
 make eval       # golden-question evaluation -> eval/results.md
 make run-ui     # Streamlit on :8501
 make run-api    # FastAPI on :8000
@@ -215,7 +215,7 @@ Additional LLM failure handling (tested with a scripted fake model in `test_llm_
 
 ## Evaluation
 
-`eval/golden_questions.yaml` holds 25 cases (78 checks) across seven categories:
+`eval/golden_questions.yaml` holds 26 cases (79 checks) across seven categories:
 - explaining changes
 - trends
 - breakdowns
@@ -230,7 +230,7 @@ Additional LLM failure handling (tested with a scripted fake model in `test_llm_
 make eval          # writes eval/results.md
 ```
 
-**Offline mode: 25/25 cases, 78/78 checks.** See [`eval/results.md`](eval/results.md). The set also runs in CI as a regression gate.
+**Offline mode: 26/26 cases, 79/79 checks.** See [`eval/results.md`](eval/results.md). The set also runs in CI as a regression gate.
 
 > **Honest caveat:** the rule-based planner and these questions were written together, so the offline score shows the system is correct on its target scenarios, not that it generalises to new phrasings. Running `LLM_MODE=live make eval` measures the LLM planner on the same questions. A larger set of paraphrased questions is the next step (see below).
 
@@ -239,7 +239,7 @@ make eval          # writes eval/results.md
 ## Testing
 
 ```bash
-make test     # 99 tests, ~18 s
+make test     # 103 tests, ~22 s
 make lint
 ```
 
