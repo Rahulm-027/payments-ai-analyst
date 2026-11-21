@@ -133,15 +133,19 @@ def write_report(results: list[CaseResult], mode: str, path: Path) -> str:
         lines.append(f"| {r.id} | {r.category} | {r.status} | {'✅' if r.passed else '❌'} | "
                      f"{r.seconds} | {failed} |")
     report = "\n".join(lines) + "\n"
-    path.write_text(report)
+    path.write_text(report, encoding="utf-8")
     return report
 
 
 def main() -> int:
+    # Windows consoles default to cp1252, which can't print ✅/❌/₹.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=str(Path(__file__).with_name("results.md")))
     args = parser.parse_args()
-    cases = yaml.safe_load(GOLDEN.read_text())["cases"]
+    cases = yaml.safe_load(GOLDEN.read_text(encoding="utf-8"))["cases"]
     pipeline = AnalystPipeline()
     results = run(pipeline, cases)
     report = write_report(results, pipeline.mode, Path(args.out))
