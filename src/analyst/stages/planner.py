@@ -42,7 +42,9 @@ Return ONLY a JSON object with these keys:
   specific subject (e.g. "how are we doing?", "what's going on?", "give me an update").
   In that case still return "intent": "breakdown" and do not guess a metric.
   If a metric or a clear subject is named, apply defaults instead of asking.
-- clarification_options: 2-3 example rephrasings when clarification_needed is set.
+- clarification_options: 2-3 example rephrasings when clarification_needed is set. Write
+  clarification_needed and the options in plain business English ("success rate",
+  "payment method"), never snake_case identifiers.
 - custom_request: for custom_sql only, a precise restatement of what to compute.
 
 Rules:
