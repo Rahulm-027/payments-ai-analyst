@@ -4,6 +4,10 @@
 
 Ask a question about payment performance in plain English, such as *"Why did success rate drop last week?"*. You get back an answer with evidence: the SQL that was run, a breakdown of what drove the change, charts, data-quality warnings, and a clear split between **observed facts**, **hypotheses** and **recommendations**.
 
+📺 **Demo video:** [Watch the walkthrough on YouTube](https://www.youtube.com/watch?v=BOiTAmC3HL8)
+
+[![Demo video](https://img.youtube.com/vi/BOiTAmC3HL8/maxresdefault.jpg)](https://www.youtube.com/watch?v=BOiTAmC3HL8)
+
 ![Mix-shift answer](docs/screenshot-mix-shift.png)
 
 ---
